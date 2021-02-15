@@ -1,4 +1,4 @@
-setwd("~/Desktop/msba/spring2021/applied_analytics/case_studies/case_study_1")
+setwd("~/Desktop/msba/spring2021/applied_analytics/case_studies/olympics_visualization")
 
 #### Read in Data and packages ######
 library(tidyverse) 
@@ -39,6 +39,8 @@ olympics <- olympics %>%
   ## Remove the one null year variable 
   filter(!is.na(Year)) %>%
   
+  ## Singapore is the NOC for a bunch of random region names. 
+  ## So it can be fixed here
   mutate(region = ifelse(NOC == 'SGP', 'Singapore', region)) %>% 
   
   ## We only select the columns we need
@@ -63,14 +65,21 @@ ui <- fluidPage(
   ## Male vs Female or both 
   checkboxGroupInput('Sex', 'Subset Sexes', 
                      choiceNames = c('Male', 'Female'), 
-                     choiceValues = c('M', 'F') 
+                     choiceValues = c('M', 'F'), 
+                     selected = c('M', 'F')
   ), 
   
   ## Which Awards do we want to look at 
   checkboxGroupInput('Medal', 'Subset Medals', 
                      choiceNames = c('Gold', 'Silver', 'Bronze', 'No Medal'), 
-                     choiceValues = c('Gold', 'Silver', 'Bronze', 'no_medal'))
+                     choiceValues = c('Gold', 'Silver', 'Bronze', 'no_medal'), 
+                     selected = c('Gold', 'Silver', 'Bronze', 'no_medal'))
   , 
+  
+  checkboxGroupInput('Season', 'Subset Seasons', 
+                     choiceNames = c('Summer', 'Winter'), 
+                     choiceValues = c('Summer', 'Winter'), 
+                     selected = c("Summer", 'Winter')), 
   
   
   mainPanel(
@@ -86,20 +95,27 @@ server <- function(input, output, server){
   output$plot <- renderPlotly({
     df <- olympics %>% 
 
-      filter(Year > input$Year[1] ) %>% 
-      filter(Year < input$Year[2]) %>% 
+      filter(Year >= input$Year[1] ) %>% 
+      filter(Year <= input$Year[2]) %>% 
       filter(Sex %in% input$Sex) %>% 
       filter(Medal %in% input$Medal) %>% 
-      group_by(NOC, region) 
-    
-    df <- Medal_Summary(df) 
+      filter(Season %in% input$Season) %>%
+      group_by(NOC, region) %>% 
+      
+      summarize(gold = sum(gold), 
+                silver = sum(silver), 
+                bronze = sum(bronze), 
+                no_medal = sum(no_medal)) %>% 
+      
+      mutate(participants = gold + silver + bronze + no_medal) 
     
     plot_ly(df, 
             type = 'choropleth', 
             locations = df$NOC, 
-            z = df$no_medal, 
-            text = df$region, 
-            colorscale = 'Blues') 
+            z = df$gold, 
+            text = df$participants, 
+            colorscale = 'Blues', reversescale = T) %>% 
+      layout(autosize = F, width =1400, height = 500) 
     
     
     
