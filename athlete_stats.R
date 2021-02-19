@@ -40,19 +40,43 @@ olympics <- olympics %>%
   
   ## Singapore is the NOC for a bunch of random region names. 
   ## So it can be fixed here
-  mutate(region = ifelse(NOC == 'SGP', 'Singapore', region))
+  mutate(region = ifelse(NOC == 'SGP', 'Singapore', region)) %>% drop_na() 
 
-#### Number of Events By Season By Year #### 
-seasons <- olympics %>% select(Year, Season) %>% 
-  mutate(winter = ifelse(Season == 'Winter', 1, 0)) %>% 
-  mutate(summer = ifelse(Season == 'Summer', 1, 0)) %>% 
-  group_by(Year) %>% summarize(summer = sum(summer), winter = sum(winter)) 
 
-## Stacked Bar Chart of sports by season for each year
-plot_ly(seasons, x = ~Year, y = ~summer, type = 'bar', name = 'Summer Games Count') %>% 
-  add_trace(y = ~winter, name = 'Winter Games Count')  %>%
-  layout( 
-         title = "Number of Participants By Year And Season", xaxis =list(title = 'Year'), yaxis = list(title = 'Numer of Participants')) 
+
+#### Create BMI #### 
+bmi_df <- olympics %>% 
+  mutate(bmi = Weight / (0.01 * Height) ^2 ) %>% 
   
+  select(Sex, Age, Height, Weight, Games, NOC, Medal, 
+         gold, silver, bronze, no_medal, bmi, Event) %>%
+  
+  mutate(low_bmi = ifelse(bmi <= 18.5, 1, 0)) %>% 
+  mutate(medium_bmi = ifelse(bmi <= 25 & bmi > 18.5, 1, 0)) %>%
+  mutate(high_bmi = ifelse(bmi <= 30 & bmi > 25, 1, 0)) %>% 
+  mutate(obese = ifelse(bmi > 30, 1, 0))
+
+event_groups <- bmi_df %>% 
+  group_by(Sex, Event) %>%
+  summarize(low_bmi = sum(low_bmi), 
+            medium_bmi = sum(medium_bmi), 
+            high_bmi = sum(high_bmi), 
+            obese = sum(obese) ) %>%
+  mutate(Male = ifelse(Sex == 'M', 1, 0)) %>%
+  mutate(Female = ifelse(Sex == 'F', 1, 0))
+
+
+
+
+event_bmi_sex <- plot_ly(event_groups %>% filter(Sex == 'F'), y = ~low_bmi, x = ~Event, 
+                         type = 'bar') %>%
+  add_trace(y = ~medium_bmi) %>% 
+  add_trace(y = ~high_bmi) %>%
+  add_trace(y = ~obese) %>%
+  layout( barmode = 'stack', xaxis = (list(tickangle = 45)), 
+    margin = list(b = 300, l = 50) # to fully display the x and y axis labels
+  )
+
+event_bmi_sex
 
 
